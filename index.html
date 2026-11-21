@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-<!-- SH | Logu mazgāšana — Logu mazgāšanas grafiks (intervāls, slodze, lietus, sals), izpilde ar bildi. Ģenerēts no SH-projekts/sh-darbi/template.html (build.py) — labot tur. © VAITKEVIX, SIA -->
+<!-- SH | Logu mazgāšana — Logu mazgāšanas grafiks (intervāls, slodze, lietus, sals), izpilde ar bildi. © VAITKEVIX, SIA -->
 <style>
 :root{--bg:#f1f4f2;--surf:#fff;--surf2:#f3f5f4;--ink:#17201c;--ink2:#4a534f;--ink3:#6d7672;--dark:#17201c;--ondark:#fff;
   --mint:#d6e8e1;--sand:#f4e4b4;--sky:#d8e6f2;--rose:#f5dbe3;--lilac:#e2ddf2;--ok:#2f5d45;--warn:#6b4a00;--bad:#8a2a3b}
@@ -157,7 +157,7 @@ button{cursor:pointer}
 
 <script>
 'use strict';
-/* Lietotnes iestatījumi (build.py) */
+/* Lietotnes iestatījumi */
 const APP = {"svc": "logi", "mode": "interval", "name": "Logu mazgāšana", "acc": "sky", "unit": "logi", "qtyL": "Logu skaits", "qtyPh": "Piem. 120", "doneL": "Nomazgāts", "doneBtn": "Nomazgāts", "lower": "logu mazgāšana", "weather": ["rain", "frost"], "wxL": "lietus un sala", "maxInt": 400, "notice": false, "veidiObj": false, "actL": "Mazgāt šī objekta logus", "notePh": "Piem. kāpņu telpas logi 5. stāvā ar pacēlāju", "objHelp": "Grafikā nonāk objekti ar logu skaitu > 0. Ievadiet logus un intervālu (piem. 180 dienas = 2× gadā) — datumus grafiks izliks pats.", "whys": ["Lietus", "Sals", "Nav piekļuves", "Tehnika", "Nepaspēju"]};
 const API = 'https://aizvietosana-api.vaitkevix.workers.dev/' + APP.svc, IMG = 'https://aizvietosana-api.vaitkevix.workers.dev/img?sz=w400&id=';
 const SNOW = APP.mode === 'snow', PINK = 'shd_pin';
