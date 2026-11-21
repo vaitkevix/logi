@@ -158,7 +158,7 @@ button{cursor:pointer}
 <script>
 'use strict';
 /* Lietotnes iestatījumi */
-const APP = {"svc": "logi", "mode": "interval", "name": "Logu mazgāšana", "acc": "sky", "unit": "logi", "qtyL": "Logu skaits", "qtyPh": "Piem. 120", "doneL": "Nomazgāts", "doneBtn": "Nomazgāts", "lower": "logu mazgāšana", "weather": ["rain", "frost"], "wxL": "lietus un sala", "maxInt": 400, "notice": false, "veidiObj": false, "actL": "Mazgāt šī objekta logus", "notePh": "Piem. kāpņu telpas logi 5. stāvā ar pacēlāju", "objHelp": "Grafikā nonāk objekti ar logu skaitu > 0. Ievadiet logus un intervālu (piem. 180 dienas = 2× gadā) — datumus grafiks izliks pats.", "whys": ["Lietus", "Sals", "Nav piekļuves", "Tehnika", "Nepaspēju"]};
+const APP = {"svc": "logi", "mode": "interval", "name": "Logu mazgāšana", "acc": "sky", "unit": "logi", "qtyL": "Logu skaits", "qtyPh": "Piem. 120", "doneL": "Nomazgāts", "doneBtn": "Nomazgāts", "lower": "logu mazgāšana", "weather": ["rain", "frost"], "wxL": "lietus un sala", "maxInt": 400, "notice": false, "veidiObj": false, "actL": "Mazgāt šī objekta logus", "notePh": "Piem. kāpņu telpas logi 5. stāvā ar pacēlāju", "objHelp": "Grafikā nonāk objekti ar logu skaitu > 0. Ievadiet logus, kāpņu telpas un cik reizes gadā mazgāt pēc līguma — datumus sezonā grafiks izliks pats.", "whys": ["Lietus", "Sals", "Nav piekļuves", "Tehnika", "Nepaspēju"]};
 const API = 'https://aizvietosana-api.vaitkevix.workers.dev/' + APP.svc, IMG = 'https://aizvietosana-api.vaitkevix.workers.dev/img?sz=w400&id=';
 const SNOW = APP.mode === 'snow', PINK = 'shd_pin';
 const $ = (id) => document.getElementById(id);
@@ -178,6 +178,8 @@ const RW = { admin: 3, vaditajs: 2, izpilditajs: 1, skatitajs: 0 };
 const can = (r) => (RW[role()] || 0) >= RW[r];
 const active = (o) => o && o.aktivs != null && o.aktivs !== 0 && (SNOW || o.qty > 0);
 const intOf = (o) => o.intervals || S.D.cfg.interval;
+const reizes = (o) => +J(o.dati).reizes || 0;   // pēc līguma: reizes gadā
+const freqL = (o) => reizes(o) ? reizes(o) + '× gadā' : 'ik ' + intOf(o) + ' d.';
 const wx = (d) => (S.D.wx || {})[d] || {};
 const ICO = {
   rain: '<path d="M7 15a4 4 0 1 1 .9-7.9A5.5 5.5 0 0 1 18.5 9 3.5 3.5 0 0 1 17.5 15"/><path d="M9 18l-1 2M13 18l-1 2M17 18l-1 2"/>',
@@ -384,30 +386,38 @@ async function reportSheet(ym) {
 }
 
 /* ---------- Logu mazgāšanas specifika ---------- */
-const L_VEIDI = ['Kāpņu telpu logi', 'Dzīvokļu logi', 'Vitrīnas', 'Fasādes stikli', 'Jumta logi'], L_TEH = ['Nav', 'Pacēlājs', 'Alpīnisti'];
-const tehOf = (od, rd) => rd.tehnika && rd.tehnika !== 'Nav' ? rd.tehnika : od.tehnika || 'Nav';
+const L_VEIDI = ['Kāpņu telpu logi', 'Dzīvokļu logi', 'Vitrīnas', 'Fasādes stikli', 'Jumta logi'], L_KAS = ['Uzkopēja', 'Brigāde', 'Katošana', 'Alpīnisti'];
+const kasOf = (od, rd) => rd.kas || od.kas || (od.tehnika === 'Alpīnisti' ? 'Alpīnisti' : '');
+const needH = (k) => k === 'Katošana' || k === 'Alpīnisti';
 const REQ = { termins: true, ph: 'Piem. vitrīna pie ieejas, abas puses',
-  fields: () => `<div class="f"><span class="lb">Kas jāmazgā</span>${chipSel('rV', L_VEIDI, [], true)}</div>
-    <div class="row2"><div class="f"><label for="rL">Logu skaits</label><input id="rL" type="number" min="0" inputmode="numeric"></div><div class="f"><label for="rSt">Stāvi</label><input id="rSt" type="number" min="0" max="40" inputmode="numeric"></div></div>
-    <div class="f"><span class="lb">Tehnika</span>${chipSel('rTe', L_TEH, 'Nav')}</div>`,
-  bind: (s) => { chipBind(s, 'rV'); chipBind(s, 'rTe'); },
-  read: (s) => { const v = chipVal(s, 'rV'); if (!v.length) { toast('Izvēlieties, kas jāmazgā', 'err'); return false; } return { dati: { veidi: v, logi: +val(s, 'rL') || 0, stavi: +val(s, 'rSt') || 0, tehnika: chipVal(s, 'rTe') || 'Nav' } }; },
-  show: (d) => [(d.veidi || []).join(', '), d.logi ? d.logi + ' logi' : '', d.stavi ? d.stavi + ' stāvi' : '', d.tehnika && d.tehnika !== 'Nav' ? d.tehnika : ''].filter(Boolean).join(' · ') };
+  fields: (pre) => { const od = J((S.D.objects.find(x => x.adrese === (pre && pre.adrese)) || {}).dati);
+    return `<div class="f"><span class="lb">Kas jāmazgā</span>${chipSel('rV', L_VEIDI, [], true)}</div>
+    <div class="row2"><div class="f"><label for="rL">Logu skaits</label><input id="rL" type="number" min="0" inputmode="numeric"></div><div class="f"><label for="rK">Kāpņu telpas</label><input id="rK" type="number" min="0" max="99" inputmode="numeric" value="${od.kapnutelpas || ''}"></div><div class="f"><label for="rSt">Stāvi</label><input id="rSt" type="number" min="0" max="40" inputmode="numeric" value="${od.stavi || ''}"></div></div>
+    <div class="f"><span class="lb">Kas mazgā</span>${chipSel('rKa', L_KAS, od.kas || '')}</div>`; },
+  bind: (s) => { chipBind(s, 'rV'); chipBind(s, 'rKa'); },
+  read: (s) => { const v = chipVal(s, 'rV'); if (!v.length) { toast('Izvēlieties, kas jāmazgā', 'err'); return false; }
+    return { dati: { veidi: v, logi: +val(s, 'rL') || 0, kapnutelpas: +val(s, 'rK') || 0, stavi: +val(s, 'rSt') || 0, kas: chipVal(s, 'rKa') || '' } }; },
+  show: (d) => [(d.veidi || []).join(', '), d.logi ? d.logi + ' logi' : '', d.kapnutelpas ? d.kapnutelpas + ' kāpņu telpas' : '', d.stavi ? d.stavi + ' stāvi' : '', d.kas ? 'mazgā: ' + d.kas.toLowerCase() : ''].filter(Boolean).join(' · ') };
 const DONE = { before: true, start: false,
-  chips: (x, o, od, rd) => `<span class="chip" style="background:var(--surf)">${nf(rd.logi || o.qty)} logi</span>${x.avots !== 'pieteikums' ? `<span class="chip" style="background:var(--surf)">ik ${intOf(o)} dienas</span>` : ''}${tehOf(od, rd) !== 'Nav' ? `<span class="chip" style="background:var(--surf)">${esc(tehOf(od, rd))}${rd.stavi || od.stavi ? ' · ' + (rd.stavi || od.stavi) + ' st.' : ''}</span>` : ''}`,
+  chips: (x, o, od, rd) => `<span class="chip" style="background:var(--surf)">${nf(rd.logi || o.qty)} logi</span>${rd.kapnutelpas || od.kapnutelpas ? `<span class="chip" style="background:var(--surf)">${rd.kapnutelpas || od.kapnutelpas} kāpņu telpas</span>` : ''}${rd.stavi || od.stavi ? `<span class="chip" style="background:var(--surf)">${rd.stavi || od.stavi} stāvi</span>` : ''}${kasOf(od, rd) ? `<span class="chip" style="background:var(--surf)">${esc(kasOf(od, rd))}</span>` : ''}${x.avots !== 'pieteikums' ? `<span class="chip" style="background:var(--surf)">${freqL(o)}</span>` : ''}`,
   tools: () => '', bindTools: () => {}, canNow: () => true,
   waitText: (x) => 'Ieplānots ' + lvS(x.datums) + (x.parcelts ? ' · pārcelts ' + x.parcelts + '×' : ''),
-  fields: (x, o, od, rd) => `<div class="row2"><div class="f"><label for="dN">Nomazgāti logi</label><input id="dN" type="number" min="0" inputmode="numeric" value="${rd.logi || o.qty || ''}"></div>${tehOf(od, rd) !== 'Nav' ? `<div class="f"><label for="dP">${esc(tehOf(od, rd))}, stundas</label><input id="dP" type="number" min="0" max="24" step="0.25" inputmode="decimal"></div>` : ''}</div>
+  fields: (x, o, od, rd) => `<div class="f"><span class="lb">Kas mazgāja</span>${chipSel('dKa', L_KAS, kasOf(od, rd))}</div>
+    <div class="row2"><div class="f"><label for="dN">Nomazgāti logi</label><input id="dN" type="number" min="0" inputmode="numeric" value="${rd.logi || o.qty || ''}"></div><div class="f"><label for="dK">Kāpņu telpas</label><input id="dK" type="number" min="0" max="99" inputmode="numeric" value="${rd.kapnutelpas || od.kapnutelpas || ''}"></div></div>
+    <div class="f" id="dHw" ${needH(kasOf(od, rd)) ? '' : 'hidden'}><label for="dH">Stundas (katošana / alpīnisti)</label><input id="dH" type="number" min="0" max="24" step="0.25" inputmode="decimal"></div>
     <div class="f"><label for="dB">Bojājumi (saplīsis stikls, rāmis…)</label><input id="dB" placeholder="Ja nav — atstājiet tukšu"></div>`,
-  bind: () => {},
-  read: (s) => { const n = +val(s, 'dN'); if (!(n > 0)) { toast('Ierakstiet, cik logu nomazgāts', 'err'); return false; } return { nomazgati: n, pacelajs_h: +val(s, 'dP') || 0, bojajumi: val(s, 'dB') }; },
-  show: (iz) => [iz.nomazgati ? iz.nomazgati + ' logi nomazgāti' : '', iz.pacelajs_h ? 'tehnika ' + iz.pacelajs_h + ' h' : '', iz.bojajumi ? '⚠ bojājumi: ' + esc(iz.bojajumi) : ''].filter(Boolean).join(' · ') };
-const REPORT = (rows) => { const n = rows.reduce((a, r) => a + (+r.iz.nomazgati || 0), 0), h = rows.reduce((a, r) => a + (+r.iz.pacelajs_h || 0), 0), b = rows.filter(r => r.iz.bojajumi).length;
-  return rows.length + ' objekti · ' + nf(n) + ' logi' + (h ? ' · tehnika ' + h.toLocaleString('lv-LV') + ' h' : '') + (b ? ' · bojājumi ' + b : ''); };
-/* Objekta iestatījumi: stāvi, tehnika */
-const OBJX = { fields: (o) => { const d = J(o.dati); return `<div class="row2"><div class="f"><label for="eSt">Stāvi</label><input id="eSt" type="number" min="0" max="40" inputmode="numeric" value="${d.stavi || ''}"></div></div><div class="f"><span class="lb">Tehnika pēc noklusējuma</span>${chipSel('eTe', L_TEH, d.tehnika || 'Nav')}</div>`; },
-  bind: (s) => chipBind(s, 'eTe'), read: (s) => ({ stavi: +val(s, 'eSt') || 0, tehnika: chipVal(s, 'eTe') || 'Nav' }) };
-
+  bind: (s) => { chipBind(s, 'dKa'); s.querySelector('#dKa').addEventListener('click', () => setTimeout(() => { s.querySelector('#dHw').hidden = !needH(chipVal(s, 'dKa')); }, 0)); },
+  read: (s) => { const n = +val(s, 'dN'), k = chipVal(s, 'dKa'); if (!(n > 0)) { toast('Ierakstiet, cik logu nomazgāts', 'err'); return false; }
+    if (!k) { toast('Atzīmējiet, kas mazgāja', 'err'); return false; }
+    const h = +val(s, 'dH') || 0; if (needH(k) && !h) { toast('Ierakstiet stundas', 'err'); return false; }
+    return { nomazgati: n, kapnutelpas: +val(s, 'dK') || 0, kas: k, stundas: needH(k) ? h : 0, bojajumi: val(s, 'dB') }; },
+  show: (iz) => [iz.kas ? esc(iz.kas) : '', iz.nomazgati ? iz.nomazgati + ' logi' : '', iz.kapnutelpas ? iz.kapnutelpas + ' kāpņu telpas' : '', iz.stundas || iz.pacelajs_h ? (iz.stundas || iz.pacelajs_h) + ' h' : '', iz.bojajumi ? '⚠ bojājumi: ' + esc(iz.bojajumi) : ''].filter(Boolean).join(' · ') };
+const REPORT = (rows) => { const n = rows.reduce((a, r) => a + (+r.iz.nomazgati || 0), 0), kt = rows.reduce((a, r) => a + (+r.iz.kapnutelpas || 0), 0), b = rows.filter(r => r.iz.bojajumi).length, K = {};
+  rows.forEach(r => { const k = r.iz.kas || 'nav norādīts'; K[k] = K[k] || { o: 0, h: 0 }; K[k].o++; K[k].h += +(r.iz.stundas || r.iz.pacelajs_h) || 0; });
+  return rows.length + ' objekti · ' + nf(n) + ' logi' + (kt ? ' · ' + kt + ' kāpņu telpas' : '') + Object.keys(K).map(k => ' · ' + k.toLowerCase() + ' ' + K[k].o + (K[k].h ? ' (' + K[k].h.toLocaleString('lv-LV') + ' h)' : '')).join('') + (b ? ' · bojājumi ' + b : ''); };
+/* Objekta iestatījumi: kāpņu telpas, stāvi, kas mazgā */
+const OBJX = { fields: (o) => { const d = J(o.dati); return `<div class="row2"><div class="f"><label for="eK">Kāpņu telpas</label><input id="eK" type="number" min="0" max="99" inputmode="numeric" value="${d.kapnutelpas || ''}"></div><div class="f"><label for="eSt">Stāvi</label><input id="eSt" type="number" min="0" max="40" inputmode="numeric" value="${d.stavi || ''}"></div></div><div class="f"><span class="lb">Kas parasti mazgā</span>${chipSel('eKa', L_KAS, d.kas || (d.tehnika === 'Alpīnisti' ? 'Alpīnisti' : ''))}</div>`; },
+  bind: (s) => chipBind(s, 'eKa'), read: (s) => ({ kapnutelpas: +val(s, 'eK') || 0, stavi: +val(s, 'eSt') || 0, kas: chipVal(s, 'eKa') || '' }) };
 /* ---------- Mēneša grafiks (intervāla lietotnes) ---------- */
 async function drawMonth(v) {
   const D = S.D, ym = S.ym, [y, m] = ym.split('-').map(Number);
@@ -454,7 +464,7 @@ function drawObjs(v) {
     <div class="search"><input id="oq" placeholder="Meklēt adresi${SNOW ? ' vai traktoristu' : ''}…" value="${esc(S.q)}" aria-label="Meklēt"><div class="seg">${['', ...(D.groups || []).map(x => x.name)].map(n => `<button type="button" data-g="${esc(n)}" class="${S.grp === n ? 'on' : ''}">${n ? esc(n.replace('Valsts nekustamie īpašumi', 'VNĪ')) : 'Visi'}</button>`).join('')}</div>
       ${g && can('vaditajs') ? `<button class="pill dk" id="gAll">Iestatīt visai grupai</button>` : ''}</div>
     <div class="list">${L.slice(0, 300).map(o => { const act = active(o);
-      const info = SNOW ? (act ? (o.brigade ? esc(o.brigade) + ' · Nr. ' + (o.seq || '—') : 'Bez traktorista') : 'Nav tīrīšanā') : act ? qf(o.qty) + ' · ik ' + intOf(o) + ' d.' + (lastBy[o.anorm] ? ' · pēdējā ' + lvS(lastBy[o.anorm]) : '') + (nextBy[o.anorm] ? ' · nākamā ' + lvS(nextBy[o.anorm]) : '') : 'Nav grafikā';
+      const info = SNOW ? (act ? (o.brigade ? esc(o.brigade) + ' · Nr. ' + (o.seq || '—') : 'Bez traktorista') : 'Nav tīrīšanā') : act ? qf(o.qty) + ' · ' + freqL(o) + (lastBy[o.anorm] ? ' · pēdējā ' + lvS(lastBy[o.anorm]) : '') + (nextBy[o.anorm] ? ' · nākamā ' + lvS(nextBy[o.anorm]) : '') : 'Nav grafikā';
       return `<button type="button" class="obj ${act ? '' : 'off'}" data-a="${esc(o.anorm)}"><span class="tx"><b>${esc(o.adrese)}</b><span>${info}${o.vaditajs ? ' · ' + esc(o.vaditajs) : ''}</span></span>
         <span class="chip">${act ? 'Grafikā' : can('vaditajs') ? '+ Pievienot' : 'Nav'}</span></button>`; }).join('') || '<div class="card empty">Nekas neatbilst</div>'}
       ${L.length > 300 ? `<p class="copy">Rāda 300 no ${L.length} — sašauriniet meklēšanu</p>` : ''}</div>`;
@@ -473,7 +483,7 @@ async function objCard(o) {
     <p style="margin:-6px 0 12px;font-weight:700;color:var(--ink3)">${[o.grupa && o.grupa !== 'SH objekti' ? esc(o.grupa) : '', o.vaditajs ? 'vadītājs ' + esc(o.vaditajs) : ''].filter(Boolean).join(' · ')}</p>
     <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 12px">
       ${SNOW ? box('Traktorists', act ? esc(o.brigade || '—') : 'nav tīrīšanā', APP.acc) + box('Secība maršrutā', act ? (o.seq || '—') : '—')
-        : box(esc(APP.qtyL), act ? qf(o.qty) : '—', APP.acc) + box('Intervāls', act ? 'ik ' + intOf(o) + ' dienas' : 'nav grafikā') + box('Nākamā reize', next ? WD[dow(next) - 1] + ', ' + lvS(next) : '—')}
+        : box(esc(APP.qtyL), act ? qf(o.qty) : '—', APP.acc) + box('Biežums (līgums)', act ? freqL(o) : 'nav grafikā') + box('Nākamā reize', next ? WD[dow(next) - 1] + ', ' + lvS(next) : '—')}
       ${box('Pēdējā', last ? lvS(last) : '—')}</div>
     ${o.veidi ? `<div class="card f" style="font-weight:700"><span class="lb" style="margin:0 0 4px">Darbi</span>${esc(o.veidi.split(',').join(' · '))}</div>` : ''}
     ${o.piekluve ? `<div class="card f" style="font-weight:700"><span class="lb" style="margin:0 0 4px">Piekļuve</span>${esc(o.piekluve)}</div>` : ''}
@@ -505,7 +515,7 @@ function editObj(o) {
   const s = sheet(`<div class="hd"><h3>${esc(o.adrese)}</h3>${X}</div>
     ${SNOW ? `<div class="f"><label for="eSeq">Secība maršrutā (1 = pirmais)</label><input id="eSeq" type="number" min="0" max="9999" inputmode="numeric" value="${o.seq || ''}" placeholder="Piem. 3"></div>`
       : `<div class="row2"><div class="f"><label for="eQ">${esc(APP.qtyL)}</label><input id="eQ" type="number" min="0" step="1" inputmode="numeric" value="${o.qty || ''}" placeholder="${esc(APP.qtyPh)}"></div>
-      <div class="f"><label for="eInt">Ik cik dienām</label><input id="eInt" type="number" min="1" max="${APP.maxInt}" inputmode="numeric" value="${intOf(o)}"></div></div>`}
+      <div class="f"><label for="eRz">Reizes gadā (pēc līguma)</label><input id="eRz" type="number" min="1" max="52" inputmode="numeric" value="${reizes(o) || ''}" placeholder="Piem. 2"></div></div>`}
     ${crewField(o.brigade)}${veidiField(o.veidi)}${OBJX.fields(o)}
     <div class="f"><label for="eNote">Piezīme izpildītājam</label><input id="eNote" value="${esc(o.piezime || '')}" placeholder="${esc(APP.notePh)}"></div>
     <div class="checks f"><label><input type="checkbox" id="eAct" ${o.aktivs === 0 || (o.aktivs == null && SNOW) ? '' : 'checked'}> ${esc(APP.actL)}</label></div>
@@ -513,19 +523,19 @@ function editObj(o) {
   OBJX.bind(s);
   const ev = s.querySelector('#eV'); if (ev) ev.onclick = (e) => { const b = e.target.closest('[data-w]'); if (b) b.classList.toggle('on'); };
   s.querySelector('#eSave').onclick = async (e) => { busy(e.target, '…');
-    try { const r = await api('saveObj', { adrese: o.adrese, qty: SNOW ? 1 : +$('eQ').value || 0, intervals: SNOW ? 0 : +$('eInt').value || S.D.cfg.interval, seq: SNOW ? +$('eSeq').value || 0 : 0,
-        brigade: $('eBr').value.trim(), piezime: $('eNote').value.trim(), aktivs: $('eAct').checked, veidi: ev ? [...ev.querySelectorAll('.on')].map(b => b.dataset.w) : (o.veidi || ''), dati: OBJX.read(s, o) });
+    try { const r = await api('saveObj', { adrese: o.adrese, qty: SNOW ? 1 : +$('eQ').value || 0, intervals: SNOW ? 0 : (+$('eRz').value ? Math.max(1, Math.floor(365 / +$('eRz').value)) : intOf(o)), seq: SNOW ? +$('eSeq').value || 0 : 0,
+        brigade: $('eBr').value.trim(), piezime: $('eNote').value.trim(), aktivs: $('eAct').checked, veidi: ev ? [...ev.querySelectorAll('.on')].map(b => b.dataset.w) : (o.veidi || ''), dati: Object.assign(OBJX.read(s, o), { reizes: +$('eRz').value || 0 }) });
       closeSheet(); toast('Saglabāts' + (r.added ? ' · ieplānots ' + r.added : '')); await load(); } catch (err) { toast(err.message, 'err'); unbusy(e.target); } };
 }
 function editGroup(g) {
   const objs = S.D.objects.filter(o => g.adreses.indexOf(o.adrese) !== -1);
-  const s = sheet(`<div class="hd"><h3>Grupa: ${esc(g.name)}</h3>${X}</div><p style="font-weight:700;color:var(--ink2);margin:0 0 12px">${objs.length} objekti. ${SNOW ? 'Traktorists attieksies uz visiem.' : 'Intervāls attieksies uz visiem; ' + esc(APP.unit) + ' paliek katram savs (objekti bez tiem grafikā nenonāk).'}</p>
-    ${SNOW ? crewField('') : `<div class="f"><label for="gInt">Ik cik dienām</label><input id="gInt" type="number" min="1" max="${APP.maxInt}" value="${S.D.cfg.interval}"></div>`}
+  const s = sheet(`<div class="hd"><h3>Grupa: ${esc(g.name)}</h3>${X}</div><p style="font-weight:700;color:var(--ink2);margin:0 0 12px">${objs.length} objekti. ${SNOW ? 'Traktorists attieksies uz visiem.' : 'Biežums attieksies uz visiem; ' + esc(APP.unit) + ' paliek katram savs (objekti bez tiem grafikā nenonāk).'}</p>
+    ${SNOW ? crewField('') : `<div class="f"><label for="gRz">Reizes gadā (pēc līguma)</label><input id="gRz" type="number" min="1" max="52" inputmode="numeric" placeholder="Piem. 2"></div>`}
     <div class="checks f"><label><input type="checkbox" id="gAct" checked> ${esc(APP.actL)} (visi grupas objekti)</label></div>
     <div class="acts" style="grid-template-columns:1fr"><button class="btn-dk" id="gSave">Saglabāt visiem</button></div>`);
   s.querySelector('#gSave').onclick = async (e) => { busy(e.target, '…');
-    try { const act = $('gAct').checked, it = SNOW ? 0 : +$('gInt').value || S.D.cfg.interval, br = SNOW ? $('eBr').value.trim() : null;
-      const r = await api('saveObj', { objs: objs.map((o, i) => ({ adrese: o.adrese, qty: SNOW ? 1 : o.qty || 0, intervals: it, seq: SNOW ? (o.seq || i + 1) : 0, brigade: br != null && br ? br : o.brigade || '', piezime: o.piezime || '', veidi: o.veidi || '', dati: J(o.dati), aktivs: act })) });
+    try { const act = $('gAct').checked, rz = +$('gRz').value || 0, it = rz ? Math.max(1, Math.floor(365 / rz)) : S.D.cfg.interval, br = SNOW ? $('eBr').value.trim() : null;
+      const r = await api('saveObj', { objs: objs.map((o, i) => ({ adrese: o.adrese, qty: SNOW ? 1 : o.qty || 0, intervals: it, seq: SNOW ? (o.seq || i + 1) : 0, brigade: br != null && br ? br : o.brigade || '', piezime: o.piezime || '', veidi: o.veidi || '', dati: Object.assign(J(o.dati), rz ? { reizes: rz } : {}), aktivs: act })) });
       closeSheet(); toast('Saglabāts ' + objs.length + (r.added ? ' · ieplānoti ' + r.added : '')); await load(); } catch (err) { toast(err.message, 'err'); unbusy(e.target); } };
 }
 
