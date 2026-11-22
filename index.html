@@ -159,7 +159,7 @@ button{cursor:pointer}
 'use strict';
 /* Lietotnes iestatījumi */
 const APP = {"svc": "logi", "mode": "interval", "name": "Logu mazgāšana", "acc": "sky", "unit": "logi", "qtyL": "Logu skaits", "qtyPh": "Piem. 120", "doneL": "Nomazgāts", "doneBtn": "Nomazgāts", "lower": "logu mazgāšana", "weather": ["rain", "frost"], "wxL": "lietus un sala", "maxInt": 400, "notice": false, "veidiObj": false, "actL": "Mazgāt šī objekta logus", "notePh": "Piem. kāpņu telpas logi 5. stāvā ar pacēlāju", "objHelp": "Grafikā nonāk objekti ar logu skaitu > 0. Ievadiet logus, kāpņu telpas un cik reizes gadā mazgāt pēc līguma — datumus sezonā grafiks izliks pats.", "whys": ["Lietus", "Sals", "Nav piekļuves", "Tehnika", "Nepaspēju"]};
-const API = 'https://aizvietosana-api.vaitkevix.workers.dev/' + APP.svc, IMG = 'https://aizvietosana-api.vaitkevix.workers.dev/img?sz=w400&id=';
+const API = 'https://vaitkevix.cloud/sh/api/' + APP.svc, IMG = 'https://vaitkevix.cloud/sh/api/img?sz=w400&id=';
 const SNOW = APP.mode === 'snow', PINK = 'shd_pin';
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
